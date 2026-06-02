@@ -2,19 +2,23 @@ import express from 'express';
 import Stripe from 'stripe';
 import ViteExpress from 'vite-express';
 
-const getEnv = (names: string[]) => {
+const getEnv = (names: string[], validate: (value: string) => boolean) => {
   const value = names.map((name) => process.env[name]).find((entry) => entry);
 
   if (!value) {
     throw new Error(`Missing required environment variable. Set one of: ${names.join(', ')}`);
   }
 
+  if (!validate(value)) {
+    throw new Error(`Invalid value for environment variable. Check one of: ${names.join(', ')}`);
+  }
+
   return value;
 };
 
 const publishableKey =
-  getEnv(['STRIPE_PUBLISHABLE_KEY', 'STRIPE_PUBLISHABLE_KEY_AGENT']);
-const secretKey = getEnv(['STRIPE_SECRET_KEY', 'STRIPE_SECRET_KEY_AGENT']);
+  getEnv(['STRIPE_PUBLISHABLE_KEY', 'STRIPE_PUBLISHABLE_KEY_AGENT'], (value) => value.startsWith('pk_'));
+const secretKey = getEnv(['STRIPE_SECRET_KEY', 'STRIPE_SECRET_KEY_AGENT'], (value) => value.startsWith('sk_'));
 
 const stripe = new Stripe(secretKey);
 
