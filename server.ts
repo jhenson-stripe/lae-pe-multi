@@ -2,23 +2,38 @@ import express from 'express';
 import Stripe from 'stripe';
 import ViteExpress from 'vite-express';
 
-const getEnv = (names: string[], validate: (value: string) => boolean) => {
-  const value = names.map((name) => process.env[name]).find((entry) => entry);
+const normalizeEnvValue = (name: string, value: string) => {
+  const trimmed = value.trim();
+  const unquoted =
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))
+      ? trimmed.slice(1, -1).trim()
+      : trimmed;
+  const assignmentPrefix = `${name}=`;
+
+  return unquoted.startsWith(assignmentPrefix) ? unquoted.slice(assignmentPrefix.length).trim() : unquoted;
+};
+
+const getEnv = (names: string[], expectedPrefix: string) => {
+  const value = names
+    .map((name) => {
+      const rawValue = process.env[name];
+      return rawValue ? normalizeEnvValue(name, rawValue) : undefined;
+    })
+    .find((entry) => entry);
 
   if (!value) {
     throw new Error(`Missing required environment variable. Set one of: ${names.join(', ')}`);
   }
 
-  if (!validate(value)) {
-    throw new Error(`Invalid value for environment variable. Check one of: ${names.join(', ')}`);
+  if (!value.startsWith(expectedPrefix)) {
+    throw new Error(`Invalid value for environment variable. ${names.join(' or ')} must start with ${expectedPrefix}`);
   }
 
   return value;
 };
 
-const publishableKey =
-  getEnv(['STRIPE_PUBLISHABLE_KEY', 'STRIPE_PUBLISHABLE_KEY_AGENT'], (value) => value.startsWith('pk_'));
-const secretKey = getEnv(['STRIPE_SECRET_KEY', 'STRIPE_SECRET_KEY_AGENT'], (value) => value.startsWith('sk_'));
+const publishableKey = getEnv(['STRIPE_PUBLISHABLE_KEY', 'STRIPE_PUBLISHABLE_KEY_AGENT'], 'pk_');
+const secretKey = getEnv(['STRIPE_SECRET_KEY', 'STRIPE_SECRET_KEY_AGENT'], 'sk_');
 
 const stripe = new Stripe(secretKey);
 
